@@ -27,6 +27,7 @@
 #include <linux/random.h>
 #include <linux/moduleloader.h>
 #include <linux/bpf.h>
+#include <linux/frame.h>
 
 #include <asm/unaligned.h>
 
@@ -733,6 +734,7 @@ load_byte:
 		WARN_RATELIMIT(1, "unknown opcode %02x\n", insn->code);
 		return 0;
 }
+STACK_FRAME_NON_STANDARD(__bpf_prog_run); /* jump table */
 
 #else
 static unsigned int __bpf_prog_ret0(void *ctx, const struct bpf_insn *insn)
