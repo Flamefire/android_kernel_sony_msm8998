@@ -1006,7 +1006,7 @@ static struct bpf_prog *bpf_migrate_filter(struct bpf_prog *fp)
 		 */
 		goto out_err_free;
 
-	err = bpf_prog_select_runtime(fp);
+	fp = bpf_prog_select_runtime(fp, &err);
 	if (err)
 		goto out_err_free;
 
