@@ -227,6 +227,7 @@ void bpf_register_prog_type(struct bpf_prog_type_list *tl);
 void bpf_register_map_type(struct bpf_map_type_list *tl);
 
 struct bpf_prog *bpf_prog_get(u32 ufd);
+struct bpf_prog *bpf_prog_get_type(u32 ufd, enum bpf_prog_type type);
 struct bpf_prog *bpf_prog_inc(struct bpf_prog *prog);
 void bpf_prog_put(struct bpf_prog *prog);
 int __bpf_prog_charge(struct user_struct *user, u32 pages);
@@ -289,6 +290,12 @@ static inline void bpf_register_prog_type(struct bpf_prog_type_list *tl)
 }
 
 static inline struct bpf_prog *bpf_prog_get(u32 ufd)
+{
+	return ERR_PTR(-EOPNOTSUPP);
+}
+
+static inline struct bpf_prog *bpf_prog_get_type(u32 ufd,
+						 enum bpf_prog_type type)
 {
 	return ERR_PTR(-EOPNOTSUPP);
 }
