@@ -332,6 +332,11 @@ static inline void bpf_prog_put(struct bpf_prog *prog)
 {
 }
 
+static inline struct bpf_prog *bpf_prog_inc(struct bpf_prog *prog)
+{
+	return ERR_PTR(-EOPNOTSUPP);
+}
+
 static inline int __bpf_prog_charge(struct user_struct *user, u32 pages)
 {
 	return 0;
