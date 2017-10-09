@@ -334,6 +334,11 @@ static inline struct bpf_prog *bpf_prog_inc(struct bpf_prog *prog)
 	return ERR_PTR(-EOPNOTSUPP);
 }
 
+static inline int bpf_obj_get_user(const char __user *pathname)
+{
+	return -EOPNOTSUPP;
+}
+
 static inline bool unprivileged_ebpf_enabled(void)
 {
 	return false;
