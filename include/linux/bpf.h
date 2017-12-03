@@ -308,6 +308,8 @@ static inline void bpf_long_memcpy(void *dst, const void *src, u32 size)
 /* verify correctness of eBPF program */
 int bpf_check(struct bpf_prog **fp, union bpf_attr *attr);
 
+struct bpf_prog *bpf_prog_get_type_path(const char *name, enum bpf_prog_type type);
+
 static inline bool unprivileged_ebpf_enabled(void)
 {
 	return !sysctl_unprivileged_bpf_disabled;
@@ -349,6 +351,12 @@ static inline void __bpf_prog_uncharge(struct user_struct *user, u32 pages)
 static inline int bpf_obj_get_user(const char __user *pathname)
 {
 	return -EOPNOTSUPP;
+}
+
+static inline struct bpf_prog *bpf_prog_get_type_path(const char *name,
+				enum bpf_prog_type type)
+{
+	return ERR_PTR(-EOPNOTSUPP);
 }
 
 static inline bool unprivileged_ebpf_enabled(void)
