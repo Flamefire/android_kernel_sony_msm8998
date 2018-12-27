@@ -467,7 +467,9 @@ static void fastrpc_mmap_add(struct fastrpc_mmap *map)
 				map->flags == ADSP_MMAP_REMOTE_HEAP_ADDR) {
 		struct fastrpc_apps *me = &gfa;
 
+		spin_lock(&me->hlock);
 		hlist_add_head(&map->hn, &me->maps);
+		spin_unlock(&me->hlock);
 	} else {
 		struct fastrpc_file *fl = map->fl;
 
@@ -486,6 +488,7 @@ static int fastrpc_mmap_find(struct fastrpc_file *fl, int fd, uintptr_t va,
 		return -EOVERFLOW;
 	if (mflags == ADSP_MMAP_HEAP_ADDR ||
 				 mflags == ADSP_MMAP_REMOTE_HEAP_ADDR) {
+		spin_lock(&me->hlock);
 		hlist_for_each_entry_safe(map, n, &me->maps, hn) {
 			if (va >= map->va &&
 				va + len <= map->va + map->len &&
@@ -499,6 +502,7 @@ static int fastrpc_mmap_find(struct fastrpc_file *fl, int fd, uintptr_t va,
 				break;
 			}
 		}
+		spin_unlock(&me->hlock);
 	} else {
 		hlist_for_each_entry_safe(map, n, &fl->maps, hn) {
 			if (va >= map->va &&
@@ -546,6 +550,7 @@ static int fastrpc_mmap_remove(struct fastrpc_file *fl, uintptr_t va,
 	struct hlist_node *n;
 	struct fastrpc_apps *me = &gfa;
 
+	spin_lock(&me->hlock);
 	hlist_for_each_entry_safe(map, n, &me->maps, hn) {
 		if (map->refs == 1 && map->raddr == va &&
 			map->raddr + map->len == va + len &&
@@ -556,6 +561,7 @@ static int fastrpc_mmap_remove(struct fastrpc_file *fl, uintptr_t va,
 			break;
 		}
 	}
+	spin_unlock(&me->hlock);
 	if (match) {
 		*ppmap = match;
 		return 0;
