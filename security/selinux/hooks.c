@@ -3679,7 +3679,6 @@ static int selinux_kernel_module_from_file(struct file *file)
 	struct common_audit_data ad;
 	struct inode_security_struct *isec;
 	struct file_security_struct *fsec;
-	struct inode *inode;
 	u32 sid = current_sid();
 	int rc;
 
@@ -3692,8 +3691,7 @@ static int selinux_kernel_module_from_file(struct file *file)
 	ad.type = LSM_AUDIT_DATA_PATH;
 	ad.u.path = file->f_path;
 
-	inode = file_inode(file);
-	isec = inode->i_security;
+	isec = inode_security(file_inode(file));
 	fsec = file->f_security;
 
 	if (sid != fsec->sid) {
