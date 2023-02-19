@@ -114,10 +114,7 @@ static inline unsigned long perf_aux_size(struct ring_buffer *rb)
 	return rb->aux_nr_pages << PAGE_SHIFT;
 }
 
-#define DEFINE_OUTPUT_COPY(func_name, memcpy_func)			\
-static inline unsigned long						\
-func_name(struct perf_output_handle *handle,				\
-	  const void *buf, unsigned long len)				\
+#define __DEFINE_OUTPUT_COPY_BODY(memcpy_func)				\
 {									\
 	unsigned long size, written;					\
 									\
@@ -142,6 +139,17 @@ func_name(struct perf_output_handle *handle,				\
 									\
 	return len;							\
 }
+
+#define DEFINE_OUTPUT_COPY(func_name, memcpy_func)			\
+static inline unsigned long						\
+func_name(struct perf_output_handle *handle,				\
+	  const void *buf, unsigned long len)				\
+__DEFINE_OUTPUT_COPY_BODY(memcpy_func)
+
+static inline unsigned long
+__output_custom(struct perf_output_handle *handle, perf_copy_f copy_func,
+		const void *buf, unsigned long len)
+__DEFINE_OUTPUT_COPY_BODY(copy_func)
 
 static inline unsigned long
 memcpy_common(void *dst, const void *src, unsigned long n)
@@ -181,8 +189,6 @@ DEFINE_OUTPUT_COPY(__output_copy_user, arch_perf_out_copy_user)
 /* Callchain handling */
 extern struct perf_callchain_entry *
 perf_callchain(struct perf_event *event, struct pt_regs *regs);
-extern int get_callchain_buffers(void);
-extern void put_callchain_buffers(void);
 
 static inline int get_recursion_context(int *recursion)
 {

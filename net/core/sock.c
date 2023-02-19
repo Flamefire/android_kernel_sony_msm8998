@@ -1389,6 +1389,7 @@ static void sk_prot_free(struct proto *prot, struct sock *sk)
 	owner = prot->owner;
 	slab = prot->slab;
 
+	cgroup_sk_free(&sk->sk_cgrp_data);
 	security_sk_free(sk);
 	if (slab != NULL)
 		kmem_cache_free(slab, sk);
@@ -1396,17 +1397,6 @@ static void sk_prot_free(struct proto *prot, struct sock *sk)
 		kfree(sk);
 	module_put(owner);
 }
-
-#if IS_ENABLED(CONFIG_CGROUP_NET_PRIO)
-void sock_update_netprioidx(struct sock *sk)
-{
-	if (in_interrupt())
-		return;
-
-	sk->sk_cgrp_prioidx = task_netprioidx(current);
-}
-EXPORT_SYMBOL_GPL(sock_update_netprioidx);
-#endif
 
 /**
  *	sk_alloc - All socket objects are allocated here
@@ -1436,8 +1426,9 @@ struct sock *sk_alloc(struct net *net, int family, gfp_t priority,
 		sock_net_set(sk, net);
 		atomic_set(&sk->sk_wmem_alloc, 1);
 
-		sock_update_classid(sk);
-		sock_update_netprioidx(sk);
+		cgroup_sk_alloc(&sk->sk_cgrp_data);
+		sock_update_classid(&sk->sk_cgrp_data);
+		sock_update_netprioidx(&sk->sk_cgrp_data);
 		sk_tx_queue_clear(sk);
 	}
 
@@ -1567,6 +1558,8 @@ struct sock *sk_clone_lock(const struct sock *sk, const gfp_t priority)
 		newsk->sk_userlocks	= sk->sk_userlocks & ~SOCK_BINDPORT_LOCK;
 
 		sock_reset_flag(newsk, SOCK_DONE);
+		cgroup_sk_clone(&newsk->sk_cgrp_data);
+
 		skb_queue_head_init(&newsk->sk_error_queue);
 
 		filter = rcu_dereference_protected(newsk->sk_filter, 1);
@@ -1598,6 +1591,9 @@ struct sock *sk_clone_lock(const struct sock *sk, const gfp_t priority)
 		newsk->sk_priority = 0;
 		newsk->sk_incoming_cpu = raw_smp_processor_id();
 		atomic64_set(&newsk->sk_cookie, 0);
+
+		cgroup_sk_alloc(&newsk->sk_cgrp_data);
+
 		/*
 		 * Before updating sk_refcnt, we must commit prior changes to memory
 		 * (Documentation/RCU/rculist_nulls.txt for details)
@@ -2307,8 +2303,8 @@ void __receive_sock(struct file *file)
 	 */
 	sock = sock_from_file(file, &error);
 	if (sock) {
-		sock_update_netprioidx(sock->sk);
-		sock_update_classid(sock->sk);
+		sock_update_netprioidx(&sock->sk->sk_cgrp_data);
+		sock_update_classid(&sock->sk->sk_cgrp_data);
 	}
 }
 

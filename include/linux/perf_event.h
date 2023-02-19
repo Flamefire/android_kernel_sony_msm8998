@@ -61,9 +61,22 @@ struct perf_callchain_entry {
 	__u64				ip[PERF_MAX_STACK_DEPTH];
 };
 
-struct perf_raw_record {
-	u32				size;
+typedef unsigned long (*perf_copy_f)(void *dst, const void *src,
+				     unsigned long len);
+
+struct perf_raw_frag {
+	union {
+		struct perf_raw_frag	*next;
+		unsigned long		pad;
+	};
+	perf_copy_f			copy;
 	void				*data;
+	u32				size;
+} __packed;
+
+struct perf_raw_record {
+	struct perf_raw_frag		frag;
+	u32				size;
 };
 
 /*
@@ -853,6 +866,12 @@ extern void perf_event_output(struct perf_event *event,
 				struct perf_sample_data *data,
 				struct pt_regs *regs);
 
+static inline bool
+is_default_overflow_handler(struct perf_event *event)
+{
+	return (event->overflow_handler == perf_event_output);
+}
+
 extern void
 perf_event_header__init_id(struct perf_event_header *header,
 			   struct perf_sample_data *data,
@@ -986,11 +1005,20 @@ DECLARE_PER_CPU(struct perf_callchain_entry, perf_callchain_entry);
 
 extern void perf_callchain_user(struct perf_callchain_entry *entry, struct pt_regs *regs);
 extern void perf_callchain_kernel(struct perf_callchain_entry *entry, struct pt_regs *regs);
+extern struct perf_callchain_entry *
+get_perf_callchain(struct pt_regs *regs, u32 init_nr, bool kernel, bool user,
+		   bool crosstask, bool add_mark);
+extern int get_callchain_buffers(void);
+extern void put_callchain_buffers(void);
 
-static inline void perf_callchain_store(struct perf_callchain_entry *entry, u64 ip)
+static inline int perf_callchain_store(struct perf_callchain_entry *entry, u64 ip)
 {
-	if (entry->nr < PERF_MAX_STACK_DEPTH)
+	if (entry->nr < PERF_MAX_STACK_DEPTH) {
 		entry->ip[entry->nr++] = ip;
+		return 0;
+	} else {
+		return -1; /* no more room, stop walking the stack */
+	}
 }
 
 extern int sysctl_perf_event_paranoid;
@@ -1029,7 +1057,7 @@ static inline bool perf_paranoid_kernel(void)
 }
 
 extern void perf_event_init(void);
-extern void perf_tp_event(u64 addr, u64 count, void *record,
+extern void perf_tp_event(u16 event_type, u64 count, void *record,
 			  int entry_size, struct pt_regs *regs,
 			  struct hlist_head *head, int rctx,
 			  struct task_struct *task);
@@ -1146,6 +1174,11 @@ extern void perf_restore_debug_store(void);
 #else
 static inline void perf_restore_debug_store(void)			{ }
 #endif
+
+static __always_inline bool perf_raw_frag_last(const struct perf_raw_frag *frag)
+{
+	return frag->pad < sizeof(u64);
+}
 
 #define perf_output_put(handle, x) perf_output_copy((handle), &(x), sizeof(x))
 
