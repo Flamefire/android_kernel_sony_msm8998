@@ -2111,7 +2111,7 @@ void lim_process_channel_switch_timeout(tpAniSirGlobal pMac)
 		 * other AP once it disconnects.
 		 */
 		pe_err("Invalid channel freq %u Ignore CSA request",
-		       channel_freq);
+		       channel);
 		return;
 	}
 	lim_covert_channel_scan_type(pMac, psessionEntry->currentOperChannel,
