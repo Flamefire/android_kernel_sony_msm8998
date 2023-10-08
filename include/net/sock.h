@@ -193,7 +193,7 @@ struct sock_common {
 	int			skc_bound_dev_if;
 	union {
 		struct hlist_node	skc_bind_node;
-		struct hlist_nulls_node skc_portaddr_node;
+		struct hlist_node	skc_portaddr_node;
 	};
 	struct proto		*skc_prot;
 	possible_net_t		skc_net;
@@ -318,6 +318,7 @@ struct cg_proto;
   *	@sk_error_report: callback to indicate errors (e.g. %MSG_ERRQUEUE)
   *	@sk_backlog_rcv: callback to process the backlog
   *	@sk_destruct: called at sock freeing time, i.e. when all refcnt == 0
+  *	@sk_reuseport_cb: reuseport group container
  */
 struct sock {
 	/*
@@ -460,6 +461,7 @@ struct sock {
 						  struct sk_buff *skb);
 	void                    (*sk_destruct)(struct sock *sk);
 	struct rcu_head		sk_rcu;
+	struct sock_reuseport __rcu	*sk_reuseport_cb;
 };
 
 #define __sk_user_data(sk) ((*((void __rcu **)&(sk)->sk_user_data)))
@@ -697,18 +699,18 @@ static inline void sk_add_bind_node(struct sock *sk,
 	hlist_for_each_entry(__sk, list, sk_bind_node)
 
 /**
- * sk_nulls_for_each_entry_offset - iterate over a list at a given struct offset
+ * sk_for_each_entry_offset_rcu - iterate over a list at a given struct offset
  * @tpos:	the type * to use as a loop cursor.
  * @pos:	the &struct hlist_node to use as a loop cursor.
  * @head:	the head for your list.
  * @offset:	offset of hlist_node within the struct.
  *
  */
-#define sk_nulls_for_each_entry_offset(tpos, pos, head, offset)		       \
-	for (pos = (head)->first;					       \
-	     (!is_a_nulls(pos)) &&					       \
+#define sk_for_each_entry_offset_rcu(tpos, pos, head, offset)		       \
+	for (pos = rcu_dereference((head)->first);			       \
+	     pos != NULL &&						       \
 		({ tpos = (typeof(*tpos) *)((void *)pos - offset); 1;});       \
-	     pos = pos->next)
+	     pos = rcu_dereference(pos->next))
 
 static inline struct user_namespace *sk_user_ns(struct sock *sk)
 {
@@ -1151,6 +1153,16 @@ static inline bool sk_stream_is_writeable(const struct sock *sk)
 	       sk_stream_memory_free(sk);
 }
 
+static inline int sk_under_cgroup_hierarchy(struct sock *sk,
+					    struct cgroup *ancestor)
+{
+#ifdef CONFIG_SOCK_CGROUP_DATA
+	return cgroup_is_descendant(sock_cgroup_ptr(&sk->sk_cgrp_data),
+				    ancestor);
+#else
+	return -ENOTSUPP;
+#endif
+}
 
 static inline bool sk_has_memory_pressure(const struct sock *sk)
 {

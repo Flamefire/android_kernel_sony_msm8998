@@ -45,8 +45,9 @@ perf_trace_##call(void *__data, proto)					\
 	__data_size = trace_event_get_offsets_##call(&__data_offsets, args); \
 									\
 	head = this_cpu_ptr(event_call->perf_events);			\
-	if (__builtin_constant_p(!__task) && !__task &&			\
-				hlist_empty(head))			\
+	if (!bpf_prog_array_valid(event_call) &&			\
+	    __builtin_constant_p(!__task) && !__task &&			\
+	    hlist_empty(head))						\
 		return;							\
 									\
 	__entry_size = ALIGN(__data_size + sizeof(*entry) + sizeof(u32),\
@@ -63,9 +64,9 @@ perf_trace_##call(void *__data, proto)					\
 									\
 	{ assign; }							\
 									\
-	perf_trace_buf_submit(entry, __entry_size, rctx,		\
-			      event_call->event.type, __count, __regs,	\
-			      head, __task);				\
+	perf_trace_run_bpf_submit(entry, __entry_size, rctx,		\
+				  event_call, __count, __regs,		\
+				  head, __task);			\
 }
 
 /*

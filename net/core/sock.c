@@ -134,6 +134,7 @@
 #include <linux/sock_diag.h>
 
 #include <linux/filter.h>
+#include <net/sock_reuseport.h>
 
 #include <trace/events/sock.h>
 
@@ -934,6 +935,32 @@ set_rcvbuf:
 		}
 		break;
 
+	case SO_ATTACH_REUSEPORT_CBPF:
+		ret = -EINVAL;
+		if (optlen == sizeof(struct sock_fprog)) {
+			struct sock_fprog fprog;
+
+			ret = -EFAULT;
+			if (copy_from_user(&fprog, optval, sizeof(fprog)))
+				break;
+
+			ret = sk_reuseport_attach_filter(&fprog, sk);
+		}
+		break;
+
+	case SO_ATTACH_REUSEPORT_EBPF:
+		ret = -EINVAL;
+		if (optlen == sizeof(u32)) {
+			u32 ufd;
+
+			ret = -EFAULT;
+			if (copy_from_user(&ufd, optval, sizeof(ufd)))
+				break;
+
+			ret = sk_reuseport_attach_bpf(ufd, sk);
+		}
+		break;
+
 	case SO_DETACH_FILTER:
 		ret = sk_detach_filter(sk);
 		break;
@@ -1034,6 +1061,7 @@ int sock_getsockopt(struct socket *sock, int level, int optname,
 
 	union {
 		int val;
+		u64 val64;
 		struct linger ling;
 		struct timeval tm;
 	} v;
@@ -1268,6 +1296,13 @@ int sock_getsockopt(struct socket *sock, int level, int optname,
 		v.val = sk->sk_incoming_cpu;
 		break;
 
+
+	case SO_COOKIE:
+		lv = sizeof(u64);
+		if (len < lv)
+			return -EINVAL;
+		v.val64 = sock_gen_cookie(sk);
+		break;
 	default:
 		/* We implement the SO_SNDLOWAT etc to not be settable
 		 * (1003.1g 7).
@@ -1453,6 +1488,8 @@ static void __sk_destruct(struct rcu_head *head)
 		sk_filter_uncharge(sk, filter);
 		RCU_INIT_POINTER(sk->sk_filter, NULL);
 	}
+	if (rcu_access_pointer(sk->sk_reuseport_cb))
+		reuseport_detach_sock(sk);
 
 	sock_disable_timestamp(sk, SK_FLAGS_TIMESTAMP);
 
@@ -1585,6 +1622,7 @@ struct sock *sk_clone_lock(const struct sock *sk, const gfp_t priority)
 			newsk = NULL;
 			goto out;
 		}
+		RCU_INIT_POINTER(newsk->sk_reuseport_cb, NULL);
 
 		newsk->sk_err	   = 0;
 		newsk->sk_err_soft = 0;
