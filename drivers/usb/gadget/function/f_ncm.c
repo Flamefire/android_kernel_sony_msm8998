@@ -1453,7 +1453,7 @@ static int ncm_bind(struct usb_configuration *c, struct usb_function *f)
 		mutex_unlock(&ncm_opts->lock);
 		if (status) {
 			free_netdev(ncm_opts->net);
-			goto netdev_cleanup;
+			goto error;
 		}
 		ncm_opts->bound = true;
 	}
