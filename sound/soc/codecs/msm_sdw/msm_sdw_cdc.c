@@ -256,8 +256,8 @@ static int msm_int_enable_sdw_cdc_clk(struct msm_sdw_priv *msm_sdw,
 			msm_sdw->int_mclk1_enabled = false;
 		}
 	}
-rtn:
 	mutex_unlock(&msm_sdw->cdc_int_mclk1_mutex);
+rtn:
 	return ret;
 }
 EXPORT_SYMBOL(msm_int_enable_sdw_cdc_clk);

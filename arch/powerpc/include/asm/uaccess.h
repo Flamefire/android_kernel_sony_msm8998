@@ -378,7 +378,6 @@ static inline unsigned long copy_from_user(void *to,
 	unsigned long ret;
 
 	if (likely(access_ok(VERIFY_READ, from, n))) {
-		check_object_size(to, n, false);
 		allow_user_access(to, from, n);
 		barrier_nospec();
 		ret = __copy_tofrom_user((__force void __user *)to, from, n);
@@ -476,8 +475,6 @@ static inline unsigned long __copy_to_user_inatomic(void __user *to,
 		if (ret == 0)
 			return 0;
 	}
-
-	check_object_size(from, n, true);
 
 	allow_write_to_user(to, n);
 	ret = __copy_tofrom_user(to, (__force const void __user *)from, n);

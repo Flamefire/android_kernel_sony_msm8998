@@ -158,7 +158,7 @@ static inline int ecryptfs_register_to_events(
 	return 1; /* dummy handle */
 }
 
-static inline int ecryptfs_unregister_from_events(int user_handle)
+static int ecryptfs_unregister_from_events(int user_handle)
 {
 	return 0;
 }
@@ -189,14 +189,13 @@ static inline bool ecryptfs_cipher_match(const void *ecrytpfs_data,
 	return false;
 }
 
-static inline bool ecryptfs_is_page_in_metadata(const void *ecrytpfs_data,
-						pgoff_t offset)
+bool ecryptfs_is_page_in_metadata(const void *ecrytpfs_data, pgoff_t offset)
 {
 	return false;
 }
 
-static inline bool ecryptfs_is_data_equal(const void *ecrytpfs_data1,
-					  const void *ecrytpfs_data2)
+bool ecryptfs_is_data_equal(const void *ecrytpfs_data1,
+		const void *ecrytpfs_data2)
 {
 	return false;
 }
