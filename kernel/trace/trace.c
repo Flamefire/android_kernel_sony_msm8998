@@ -1644,7 +1644,12 @@ static void __trace_find_cmdline(int pid, char comm[])
 			return;
 		}
 	}
-	strcpy(comm, "<...>");
+
+	map = savedcmd->map_pid_to_cmdline[pid];
+	if (map != NO_CMDLINE_MAP)
+		strlcpy(comm, get_saved_cmdlines(map), TASK_COMM_LEN - 1);
+	else
+		strcpy(comm, "<...>");
 }
 
 void trace_find_cmdline(int pid, char comm[])
@@ -3101,7 +3106,11 @@ static int s_show(struct seq_file *m, void *v)
 		iter->leftover = ret;
 
 	} else {
-		print_trace_line(iter);
+		ret = print_trace_line(iter);
+		if (ret == TRACE_TYPE_PARTIAL_LINE) {
+			iter->seq.full = 0;
+			trace_seq_puts(&iter->seq, "[LINE TOO BIG]\n");
+		}
 		ret = trace_print_seq(m, &iter->seq);
 		/*
 		 * If we overflow the seq_file buffer, then it will

@@ -38,8 +38,8 @@
 #define USB_VENDOR_TEXAS_INSTRUMENTS		0x0451
 #define USB_PRODUCT_TUSB8041_USB3		0x8140
 #define USB_PRODUCT_TUSB8041_USB2		0x8142
-#define HUB_QUIRK_CHECK_PORT_AUTOSUSPEND	0x01
-#define HUB_QUIRK_DISABLE_AUTOSUSPEND		0x02
+#define HUB_QUIRK_CHECK_PORT_AUTOSUSPEND	BIT(0)
+#define HUB_QUIRK_DISABLE_AUTOSUSPEND		BIT(1)
 
 extern int deny_new_usb;
 
@@ -1710,6 +1710,47 @@ static int hub_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	hdev = interface_to_usbdev(intf);
 
 	/*
+	 * Set default autosuspend delay as 0 to speedup bus suspend,
+	 * based on the below considerations:
+	 *
+	 * - Unlike other drivers, the hub driver does not rely on the
+	 *   autosuspend delay to provide enough time to handle a wakeup
+	 *   event, and the submitted status URB is just to check future
+	 *   change on hub downstream ports, so it is safe to do it.
+	 *
+	 * - The patch might cause one or more auto supend/resume for
+	 *   below very rare devices when they are plugged into hub
+	 *   first time:
+	 *
+	 *   	devices having trouble initializing, and disconnect
+	 *   	themselves from the bus and then reconnect a second
+	 *   	or so later
+	 *
+	 *   	devices just for downloading firmware, and disconnects
+	 *   	themselves after completing it
+	 *
+	 *   For these quite rare devices, their drivers may change the
+	 *   autosuspend delay of their parent hub in the probe() to one
+	 *   appropriate value to avoid the subtle problem if someone
+	 *   does care it.
+	 *
+	 * - The patch may cause one or more auto suspend/resume on
+	 *   hub during running 'lsusb', but it is probably too
+	 *   infrequent to worry about.
+	 *
+	 * - Change autosuspend delay of hub can avoid unnecessary auto
+	 *   suspend timer for hub, also may decrease power consumption
+	 *   of USB bus.
+	 *
+	 * - If user has indicated to prevent autosuspend by passing
+	 *   usbcore.autosuspend = -1 then keep autosuspend disabled.
+	 */
+#ifdef CONFIG_PM
+	if (hdev->dev.power.autosuspend_delay >= 0)
+		pm_runtime_set_autosuspend_delay(&hdev->dev, 0);
+#endif
+
+	/*
 	 * Hubs have proper suspend/resume support, except for root hubs
 	 * where the controller driver doesn't have bus_suspend and
 	 * bus_resume methods.
@@ -2249,17 +2290,25 @@ static int usb_enumerate_device_otg(struct usb_device *udev)
 			}
 		} else if (desc->bLength == sizeof
 				(struct usb_otg_descriptor)) {
-			/* Set a_alt_hnp_support for legacy otg device */
-			err = usb_control_msg(udev,
-				usb_sndctrlpipe(udev, 0),
-				USB_REQ_SET_FEATURE, 0,
-				USB_DEVICE_A_ALT_HNP_SUPPORT,
-				0, NULL, 0,
-				USB_CTRL_SET_TIMEOUT);
-			if (err < 0)
-				dev_err(&udev->dev,
-					"set a_alt_hnp_support failed: %d\n",
-					err);
+			/*
+			 * We are operating on a legacy OTP device
+			 * These should be told that they are operating
+			 * on the wrong port if we have another port that does
+			 * support HNP
+			 */
+			if (bus->otg_port != 0) {
+				/* Set a_alt_hnp_support for legacy otg device */
+				err = usb_control_msg(udev,
+					usb_sndctrlpipe(udev, 0),
+					USB_REQ_SET_FEATURE, 0,
+					USB_DEVICE_A_ALT_HNP_SUPPORT,
+					0, NULL, 0,
+					USB_CTRL_SET_TIMEOUT);
+				if (err < 0)
+					dev_err(&udev->dev,
+						"set a_alt_hnp_support failed: %d\n",
+						err);
+			}
 		}
 	}
 #endif
@@ -4814,7 +4863,6 @@ static void hub_port_connect(struct usb_hub *hub, int port1, u16 portstatus,
 			goto done;
 		return;
 	}
-
 	if (deny_new_usb) {
 		dev_err(&port_dev->dev, "denied insert of USB device on port %d\n", port1);
 		goto done;

@@ -193,11 +193,6 @@ int pwm_config_period_value(struct pwm_device *pwm,
 int pwm_get_max_pwm_value(struct pwm_device *pwm);
 void pwm_set_max_pwm_value(struct pwm_device *pwm, int max);
 
-/*
- * synchronized enable of multiple pwm instances
- */
-int pwm_enable_synchronized(struct pwm_device **pwms, size_t num);
-
 #else
 static inline int pwm_config_period(struct pwm_device *pwm,
 			     struct pwm_period_config *pwm_p)
@@ -223,11 +218,6 @@ static inline int pwm_lut_config(struct pwm_device *pwm, int period_us,
 
 static inline int pwm_config_us(struct pwm_device *pwm,
 		int duty_us, int period_us)
-{
-	return -EINVAL;
-}
-
-static inline int pwm_enable_synchronized(struct pwm_device **pwms, size_t num)
 {
 	return -EINVAL;
 }
