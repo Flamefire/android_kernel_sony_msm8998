@@ -1389,7 +1389,6 @@ void set_task_cpu(struct task_struct *p, unsigned int new_cpu)
 		perf_event_task_migrate(p);
 
 		walt_fixup_busy_time(p, new_cpu);
-		fixup_busy_time(p, new_cpu);
 	}
 
 	__set_task_cpu(p, new_cpu);

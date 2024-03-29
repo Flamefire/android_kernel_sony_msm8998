@@ -2112,6 +2112,12 @@ static int ffs_func_eps_enable(struct ffs_function *func)
 			break;
 		}
 
+		/*
+		 * userspace setting maxburst > 1 results more fifo
+		 * allocation than without maxburst. Change maxburst to 1
+		 * only to allocate fifo size of max packet size.
+		 */
+		ep->ep->maxburst = 1;
 		ret = usb_ep_enable(ep->ep);
 		if (likely(!ret)) {
 			epfile->ep = ep;
@@ -4236,7 +4242,6 @@ static void ffs_closed(struct ffs_data *ffs)
 {
 	struct ffs_dev *ffs_obj;
 	struct f_fs_opts *opts;
-	struct config_item *ci;
 
 	ENTER();
 
@@ -4270,14 +4275,13 @@ static void ffs_closed(struct ffs_data *ffs)
 		goto done;
 	}
 
-	ci = opts->func_inst.group.cg_item.ci_parent->ci_parent;
 	ffs_dev_unlock();
 
 	if (test_bit(FFS_FL_BOUND, &ffs->flags)) {
-		unregister_gadget_item(ci);
+		unregister_gadget_item(opts->
+			       func_inst.group.cg_item.ci_parent->ci_parent);
 		ffs_log("unreg gadget done");
 	}
-	return;
 done:
 	ffs_log("exit");
 }

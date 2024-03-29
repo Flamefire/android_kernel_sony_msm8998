@@ -180,7 +180,7 @@
 #define RGB_LED_EN_CTL(base)		(base + 0x46)
 #define RGB_LED_ATC_CTL(base)		(base + 0x47)
 
-#define RGB_MAX_LEVEL			LED_FULL
+#define RGB_MAX_LEVEL			512
 #define RGB_LED_ENABLE_RED		0x80
 #define RGB_LED_ENABLE_GREEN		0x40
 #define RGB_LED_ENABLE_BLUE		0x20
@@ -4589,14 +4589,13 @@ static int qpnp_leds_probe(struct platform_device *pdev)
 		rc = led_classdev_register(&pdev->dev, &rgb_sync->cdev);
 		if (rc) {
 			dev_err(&pdev->dev, "unable to register rgb %d\n", rc);
-			kfree(rgb_sync);
 			rgb_sync = 0;
 		}
 		rc = rc ? rc :
 			qpnp_add_attributes(rgb_sync->cdev.dev, rgbcommon_attr);
 		if (rc) {
-			dev_err(&pdev->dev, "unable to create rgb sysfs %d\n", rc);
-			goto fail_id_check;
+			dev_err(&pdev->dev, "unable to create sysfs %d\n", rc);
+			rgb_sync = 0;
 		}
 	}
 	dev_info(&pdev->dev, "rgb_sync prepare %d\n", prepare_rgb_sync);
@@ -4859,10 +4858,6 @@ static int qpnp_leds_probe(struct platform_device *pdev)
 	return 0;
 
 fail_id_check:
-	if (rgb_sync) {
-		led_classdev_unregister(&rgb_sync->cdev);
-		kfree(rgb_sync);
-	}
 	for (i = 0; i < parsed_leds; i++) {
 		if (led_array[i].id != QPNP_ID_FLASH1_LED0 &&
 				led_array[i].id != QPNP_ID_FLASH1_LED1)
