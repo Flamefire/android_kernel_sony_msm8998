@@ -48,6 +48,7 @@ struct netlink_sock {
 	struct module		*module;
 
 	struct rhash_head	node;
+	struct rcu_head		rcu;
 	struct work_struct	work;
 };
 
