@@ -169,7 +169,7 @@ static inline u32 netlink_group_mask(u32 group)
 static struct sk_buff *netlink_to_full_skb(const struct sk_buff *skb,
 					   gfp_t gfp_mask)
 {
-	unsigned int len = skb_end_offset(skb);
+	unsigned int len = skb->len;
 	struct sk_buff *new;
 
 	new = alloc_skb(len, gfp_mask);
@@ -492,9 +492,8 @@ static struct sock *netlink_lookup(struct net *net, int protocol, u32 portid)
 
 	rcu_read_lock();
 	sk = __netlink_lookup(table, portid, net);
-	if (sk && !atomic_inc_not_zero(&sk->sk_refcnt))
-		sk = NULL;
-
+	if (sk)
+		sock_hold(sk);
 	rcu_read_unlock();
 
 	return sk;
@@ -624,7 +623,6 @@ static int __netlink_create(struct net *net, struct socket *sock,
 	}
 	init_waitqueue_head(&nlk->wait);
 
-	sock_set_flag(sk, SOCK_RCU_FREE);
 	sk->sk_destruct = netlink_sock_destruct;
 	sk->sk_protocol = protocol;
 	return 0;
@@ -690,6 +688,17 @@ out_module:
 	goto out;
 }
 
+static void deferred_put_nlk_sk(struct rcu_head *head)
+{
+	struct netlink_sock *nlk = container_of(head, struct netlink_sock, rcu);
+	struct sock *sk = &nlk->sk;
+
+	if (!atomic_dec_and_test(&sk->sk_refcnt))
+		return;
+
+	sk_free(sk);
+}
+
 static int netlink_release(struct socket *sock)
 {
 	struct sock *sk = sock->sk;
@@ -736,6 +745,14 @@ static int netlink_release(struct socket *sock)
 				NETLINK_URELEASE, &n);
 	}
 
+	/* Terminate any outstanding dump */
+	if (nlk->cb_running) {
+		if (nlk->cb.done)
+			nlk->cb.done(&nlk->cb);
+		module_put(nlk->cb.module);
+		kfree_skb(nlk->cb.skb);
+	}
+
 	module_put(nlk->module);
 
 	if (netlink_is_kernel(sk)) {
@@ -762,19 +779,7 @@ static int netlink_release(struct socket *sock)
 	local_bh_disable();
 	sock_prot_inuse_add(sock_net(sk), &netlink_proto, -1);
 	local_bh_enable();
-	if (nlk->cb_running) {
-		mutex_lock(nlk->cb_mutex);
-		if (nlk->cb_running) {
-			if (nlk->cb.done)
-				nlk->cb.done(&nlk->cb);
-
-			module_put(nlk->cb.module);
-			kfree_skb(nlk->cb.skb);
-			nlk->cb_running = false;
-		}
-		mutex_unlock(nlk->cb_mutex);
-	}
-	sock_put(sk);
+	call_rcu(&nlk->rcu, deferred_put_nlk_sk);
 	return 0;
 }
 
@@ -2100,8 +2105,9 @@ void __netlink_clear_multicast_users(struct sock *ksk, unsigned int group)
 {
 	struct sock *sk;
 	struct netlink_table *tbl = &nl_table[ksk->sk_protocol];
+	struct hlist_node *tmp;
 
-	sk_for_each_bound(sk, &tbl->mc_list)
+	sk_for_each_bound_safe(sk, tmp, &tbl->mc_list)
 		netlink_update_socket_mc(nlk_sk(sk), group, 0);
 }
 

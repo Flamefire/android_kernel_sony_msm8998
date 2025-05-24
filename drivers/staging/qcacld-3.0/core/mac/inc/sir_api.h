@@ -106,7 +106,8 @@ typedef uint8_t tSirVersionString[SIR_VERSION_STRING_LEN];
 
 #define MAX_POWER_DBG_ARGS_SUPPORTED 8
 #define QOS_MAP_MAX_EX  21
-#define QOS_MAP_LEN_MIN 16
+#define QOS_MAP_RANGE_NUM 8
+#define QOS_MAP_LEN_MIN (QOS_MAP_RANGE_NUM * 2)
 #define QOS_MAP_LEN_MAX \
 	(QOS_MAP_LEN_MIN + 2 * QOS_MAP_MAX_EX)
 #define NUM_CHAINS_MAX  2
@@ -2386,8 +2387,8 @@ typedef struct sSirAggrQosRsp {
 typedef struct sSirQosMapSet {
 	uint8_t present;
 	uint8_t num_dscp_exceptions;
-	uint8_t dscp_exceptions[21][2];
-	uint8_t dscp_range[8][2];
+	uint8_t dscp_exceptions[QOS_MAP_MAX_EX][2];
+	uint8_t dscp_range[QOS_MAP_RANGE_NUM][2];
 } tSirQosMapSet, *tpSirQosMapSet;
 
 typedef struct sSmeIbssPeerInd {
