@@ -559,6 +559,12 @@ static int __read_queue(struct vidc_iface_q_info *qinfo, u8 *packet,
 					(u8 *)qinfo->q_array.align_virtual_addr,
 					new_read_idx << 2);
 		}
+		/*
+		* Copy back the validated size to avoid security issue. As we are reading
+		* the packet from a shared queue, there is a possibility to get the
+		* packet->size data corrupted of shared queue by mallicious FW.
+		*/
+		*((u32 *) packet) = packet_size_in_words << 2;
 	} else {
 		dprintk(VIDC_WARN,
 			"BAD packet received, read_idx: %#x, pkt_size: %d\n",
@@ -3402,6 +3408,9 @@ static void print_sfr_message(struct venus_hfi_device *device)
 	vsfr = (struct hfi_sfr_struct *)device->sfr.align_virtual_addr;
 	if (vsfr) {
 		vsfr_size = vsfr->bufSize - sizeof(u32);
+		if(vsfr_size <= sizeof(u32) || vsfr_size - sizeof(u32) > ALIGNED_SFR_SIZE)
+			return;
+		vsfr_size -= sizeof(u32);
 		p = memchr(vsfr->rg_data, '\0', vsfr_size);
 		/* SFR isn't guaranteed to be NULL terminated */
 		if (p == NULL)
